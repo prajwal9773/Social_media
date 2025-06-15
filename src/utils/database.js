@@ -20,13 +20,17 @@ const initializePool = () => {
     });
 
     // Check for missing environment variables
-    const requiredEnvVars = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
-    const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+    // Either DATABASE_URL or individual DB variables are required
+    const hasDatabaseUrl = !!process.env.DATABASE_URL;
+    const hasIndividualVars = !!(process.env.DB_HOST && process.env.DB_PORT && process.env.DB_NAME && process.env.DB_USER && process.env.DB_PASSWORD);
     
-    if (missingVars.length > 0) {
-      logger.critical("MISSING REQUIRED ENVIRONMENT VARIABLES:", missingVars);
-      throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+    if (!hasDatabaseUrl && !hasIndividualVars) {
+      const missingMessage = "Either DATABASE_URL or all individual DB variables (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD) are required";
+      logger.critical(missingMessage);
+      throw new Error(missingMessage);
     }
+    
+    logger.verbose("Database connection method:", hasDatabaseUrl ? "DATABASE_URL" : "Individual variables");
 
     // Use DATABASE_URL if available (recommended for Render)
     const config = process.env.DATABASE_URL ? {
