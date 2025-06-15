@@ -1,0 +1,1171 @@
+openapi: 3.0.0
+info:
+  title: Social Media API
+  description: API documentation for the social media platform
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000
+    description: Development server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Enter your JWT token in the format: Bearer <your-token>
+        
+        Example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        
+        Note: The token is obtained from the login response
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: User ID
+        username:
+          type: string
+          description: Username
+        email:
+          type: string
+          format: email
+          description: Email address
+        full_name:
+          type: string
+          description: Full name
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Post ID
+        content:
+          type: string
+          description: Post content
+        media_url:
+          type: string
+          description: URL to media content (optional)
+        comments_enabled:
+          type: boolean
+          description: Whether comments are enabled
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        likes_count:
+          type: integer
+          description: Number of likes
+        comments_count:
+          type: integer
+          description: Number of comments
+
+    AuthResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Response message
+        user:
+          $ref: '#/components/schemas/User'
+        token:
+          type: string
+          description: JWT token
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error type
+        message:
+          type: string
+          description: Error message
+
+    ScheduledPost:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Scheduled post ID
+        user_id:
+          type: integer
+          description: User ID
+        content:
+          type: string
+          description: Post content
+        media_url:
+          type: string
+          description: URL to media content (optional)
+        comments_enabled:
+          type: boolean
+          description: Whether comments are enabled
+        scheduled_at:
+          type: string
+          format: date-time
+          description: Scheduled time for posting
+        status:
+          type: string
+          enum: [pending, posted, cancelled]
+          description: Current status of the scheduled post
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+
+    ScheduledPostCreate:
+      type: object
+      required:
+        - content
+        - scheduled_at
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Post content
+        media_url:
+          type: string
+          description: URL to media content (optional)
+        comments_enabled:
+          type: boolean
+          description: Whether comments are enabled
+        scheduled_at:
+          type: string
+          format: date-time
+          description: Scheduled time for posting
+
+    ScheduledPostUpdate:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Post content
+        media_url:
+          type: string
+          description: URL to media content (optional)
+        comments_enabled:
+          type: boolean
+          description: Whether comments are enabled
+        scheduled_at:
+          type: string
+          format: date-time
+          description: Scheduled time for posting
+
+paths:
+  /api/auth/register:
+    post:
+      summary: Register a new user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - email
+                - password
+                - full_name
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 30
+                  description: Username (must be unique)
+                email:
+                  type: string
+                  format: email
+                  description: Email address (must be unique)
+                password:
+                  type: string
+                  minLength: 6
+                  description: Password (minimum 6 characters)
+                full_name:
+                  type: string
+                  maxLength: 100
+                  description: Full name
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/login:
+    post:
+      summary: Login user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  description: Username or email
+                password:
+                  type: string
+                  description: Password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/profile:
+    get:
+      summary: Get current user profile
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/posts:
+    post:
+      summary: Create a new post
+      tags: [Posts]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+                  description: Post content
+                media_url:
+                  type: string
+                  description: URL to media content (optional)
+                comments_enabled:
+                  type: boolean
+                  description: Whether comments are enabled
+      responses:
+        '201':
+          description: Post created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/posts/my:
+    get:
+      summary: Get current user's posts
+      tags: [Posts]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Posts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/posts/{post_id}:
+    get:
+      summary: Get a single post by ID
+      tags: [Posts]
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          schema:
+            type: integer
+          description: Post ID
+      responses:
+        '200':
+          description: Post retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete a post
+      tags: [Posts]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          schema:
+            type: integer
+          description: Post ID
+      responses:
+        '200':
+          description: Post deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/posts/user/{user_id}:
+    get:
+      summary: Get posts by a specific user
+      tags: [Posts]
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        '200':
+          description: Posts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/users/follow:
+    post:
+      summary: Follow a user
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - following_id
+              properties:
+                following_id:
+                  type: integer
+                  description: ID of user to follow
+      responses:
+        '200':
+          description: Follow successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/users/unfollow:
+    delete:
+      summary: Unfollow a user
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - following_id
+              properties:
+                following_id:
+                  type: integer
+                  description: ID of user to unfollow
+      responses:
+        '200':
+          description: Unfollow successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/users/{user_id}/followers:
+    get:
+      summary: Get user's followers
+      tags: [Users]
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        '200':
+          description: Followers retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/users/{user_id}/following:
+    get:
+      summary: Get users that the specified user is following
+      tags: [Users]
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        '200':
+          description: Following list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/users/{user_id}/follow-counts:
+    get:
+      summary: Get user's follower and following counts
+      tags: [Users]
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        '200':
+          description: Follow counts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  followers_count:
+                    type: integer
+                    description: Number of followers
+                  following_count:
+                    type: integer
+                    description: Number of users being followed
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/users/{user_id}/feed:
+    get:
+      summary: Get user's feed (posts from followed users)
+      tags: [Users]
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+          description: User ID
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Number of posts per page
+      responses:
+        '200':
+          description: Feed retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Post'
+                  total:
+                    type: integer
+                    description: Total number of posts
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/posts/{post_id}/likes:
+    post:
+      summary: Like a post
+      tags: [Posts]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          schema:
+            type: integer
+          description: Post ID
+      responses:
+        '200':
+          description: Post liked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Unlike a post
+      tags: [Posts]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          schema:
+            type: integer
+          description: Post ID
+      responses:
+        '200':
+          description: Post unliked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/posts/{post_id}/comments:
+    post:
+      summary: Add a comment to a post
+      tags: [Posts]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          schema:
+            type: integer
+          description: Post ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
+                  description: Comment content
+      responses:
+        '201':
+          description: Comment created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: Comment ID
+                  content:
+                    type: string
+                    description: Comment content
+                  user:
+                    $ref: '#/components/schemas/User'
+                  created_at:
+                    type: string
+                    format: date-time
+                    description: Creation timestamp
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: Get comments for a post
+      tags: [Posts]
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          schema:
+            type: integer
+          description: Post ID
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Number of comments per page
+      responses:
+        '200':
+          description: Comments retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comments:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        content:
+                          type: string
+                        user:
+                          $ref: '#/components/schemas/User'
+                        created_at:
+                          type: string
+                          format: date-time
+                  total:
+                    type: integer
+                    description: Total number of comments
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/posts/{post_id}/comments/{comment_id}:
+    delete:
+      summary: Delete a comment
+      tags: [Posts]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: post_id
+          required: true
+          schema:
+            type: integer
+          description: Post ID
+        - in: path
+          name: comment_id
+          required: true
+          schema:
+            type: integer
+          description: Comment ID
+      responses:
+        '200':
+          description: Comment deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Comment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/posts/search:
+    get:
+      summary: Search posts by content
+      tags: [Posts]
+      parameters:
+        - in: query
+          name: query
+          required: true
+          schema:
+            type: string
+          description: Search term
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Number of posts per page
+      responses:
+        '200':
+          description: Search results retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Post'
+                  total:
+                    type: integer
+                    description: Total number of matching posts
+        '400':
+          description: Invalid search term
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/scheduled-posts:
+    post:
+      summary: Create a new scheduled post
+      tags: [Scheduled Posts]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduledPostCreate'
+      responses:
+        '201':
+          description: Scheduled post created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledPost'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: Get user's scheduled posts
+      tags: [Scheduled Posts]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, posted, cancelled]
+          description: Filter by post status
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Number of posts per page
+      responses:
+        '200':
+          description: Scheduled posts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ScheduledPost'
+                  total:
+                    type: integer
+                    description: Total number of posts
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/scheduled-posts/{scheduled_post_id}:
+    get:
+      summary: Get a specific scheduled post
+      tags: [Scheduled Posts]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: scheduled_post_id
+          required: true
+          schema:
+            type: integer
+          description: Scheduled post ID
+      responses:
+        '200':
+          description: Scheduled post retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledPost'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Scheduled post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      summary: Update a scheduled post
+      tags: [Scheduled Posts]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: scheduled_post_id
+          required: true
+          schema:
+            type: integer
+          description: Scheduled post ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduledPostUpdate'
+      responses:
+        '200':
+          description: Scheduled post updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledPost'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Scheduled post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Cancel a scheduled post
+      tags: [Scheduled Posts]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: scheduled_post_id
+          required: true
+          schema:
+            type: integer
+          description: Scheduled post ID
+      responses:
+        '200':
+          description: Scheduled post cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Scheduled post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/scheduled-posts/{scheduled_post_id}/publish:
+    post:
+      summary: Publish a scheduled post immediately
+      tags: [Scheduled Posts]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: scheduled_post_id
+          required: true
+          schema:
+            type: integer
+          description: Scheduled post ID
+      responses:
+        '200':
+          description: Post published successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+                  post:
+                    $ref: '#/components/schemas/Post'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Scheduled post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

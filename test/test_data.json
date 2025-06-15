@@ -1,0 +1,93 @@
+{
+  "auth": {
+    "register": {
+      "method": "POST",
+      "url": "/api/auth/register",
+      "body": {
+        "username": "testuser2",
+        "email": "test2@example.com",
+        "password": "password123",
+        "full_name": "Test User"
+      }
+    },
+    "login": {
+      "method": "POST",
+      "url": "/api/auth/login",
+      "body": {
+        "username": "testuser2",
+        "password": "password123"
+      }
+    },
+    "profile": {
+      "method": "GET",
+      "url": "/api/auth/profile",
+      "headers": {
+        "Authorization": "Bearer YOUR_ACCESS_TOKEN"
+      }
+    }
+  },
+  "posts": {
+    "create": {
+      "method": "POST",
+      "url": "/api/posts",
+      "headers": {
+        "Authorization": "Bearer YOUR_ACCESS_TOKEN"
+      },
+      "body": {
+        "content": "Hello, this is my first post!",
+        "media_url": "https://example.com/image.jpg",
+        "comments_enabled": true
+      }
+    },
+    "get_my_posts": {
+      "method": "GET",
+      "url": "/api/posts/my",
+      "headers": {
+        "Authorization": "Bearer YOUR_ACCESS_TOKEN"
+      }
+    },
+    "get_post_by_id": {
+      "method": "GET",
+      "url": "/api/posts/1",
+      "headers": {
+        "Authorization": "Bearer YOUR_ACCESS_TOKEN"
+      }
+    },
+    "get_user_posts": {
+      "method": "GET",
+      "url": "/api/posts/user/1",
+      "headers": {
+        "Authorization": "Bearer YOUR_ACCESS_TOKEN"
+      }
+    },
+    "delete_post": {
+      "method": "DELETE",
+      "url": "/api/posts/1",
+      "headers": {
+        "Authorization": "Bearer YOUR_ACCESS_TOKEN"
+      }
+    }
+  },
+  "users": {
+    "follow": {
+      "method": "POST",
+      "url": "/api/users/follow",
+      "headers": {
+        "Authorization": "Bearer YOUR_ACCESS_TOKEN"
+      },
+      "body": {
+        "following_id": 2
+      }
+    },
+    "unfollow": {
+      "method": "DELETE",
+      "url": "/api/users/unfollow",
+      "headers": {
+        "Authorization": "Bearer YOUR_ACCESS_TOKEN"
+      },
+      "body": {
+        "following_id": 2
+      }
+    }
+  }
+}
