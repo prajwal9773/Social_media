@@ -4,7 +4,7 @@ info:
   description: API documentation for the social media platform
   version: 1.0.0
 servers:
-  - url: https://social-media-fluy.onrender.com/api
+  - url: https://social-media-fluy.onrender.com
     description: Development server
 
 components:
