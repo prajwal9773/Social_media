@@ -28,7 +28,16 @@ const initializePool = () => {
       throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
     }
 
-    const config = {
+    // Use DATABASE_URL if available (recommended for Render)
+    const config = process.env.DATABASE_URL ? {
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? {
+        rejectUnauthorized: false
+      } : false,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    } : {
       host: process.env.DB_HOST,
       port: parseInt(process.env.DB_PORT, 10),
       database: process.env.DB_NAME,
@@ -36,8 +45,7 @@ const initializePool = () => {
       password: process.env.DB_PASSWORD,
       max: 20,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000, // Increased timeout for Render
-      // SSL configuration for production (Render requires SSL)
+      connectionTimeoutMillis: 10000,
       ssl: process.env.NODE_ENV === 'production' ? {
         rejectUnauthorized: false
       } : false
