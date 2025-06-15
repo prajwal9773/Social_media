@@ -8,37 +8,97 @@ let pool;
  * @returns {Pool} PostgreSQL connection pool
  */
 const initializePool = () => {
-	if (!pool) {
-		pool = new Pool({
-			connectionString: process.env.DATABASE_URL,
-			ssl: {
-				rejectUnauthorized: false, // Important for Render-hosted PostgreSQL
-			},
-			max: 20,
-			idleTimeoutMillis: 30000,
-			connectionTimeoutMillis: 2000,
-		});
+  if (!pool) {
+    // Debug: Log environment variables (without password)
+    logger.verbose("Database configuration:", {
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      database: process.env.DB_NAME,
+      user: process.env.DB_USER,
+      node_env: process.env.NODE_ENV,
+      has_password: !!process.env.DB_PASSWORD
+    });
 
-		pool.on("error", (err) => {
-			logger.critical("Unexpected error on idle client", err);
-		});
-	}
-	return pool;
+    // Check for missing environment variables
+    const requiredEnvVars = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
+    const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+    
+    if (missingVars.length > 0) {
+      logger.critical("MISSING REQUIRED ENVIRONMENT VARIABLES:", missingVars);
+      throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+    }
+
+    const config = {
+      host: process.env.DB_HOST,
+      port: parseInt(process.env.DB_PORT, 10),
+      database: process.env.DB_NAME,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000, // Increased timeout for Render
+      // SSL configuration for production (Render requires SSL)
+      ssl: process.env.NODE_ENV === 'production' ? {
+        rejectUnauthorized: false
+      } : false
+    };
+
+    logger.verbose("Creating pool with config:", {
+      ...config,
+      password: '[REDACTED]'
+    });
+
+    pool = new Pool(config);
+
+    pool.on("error", (err) => {
+      logger.critical("Unexpected error on idle client", err);
+    });
+
+    pool.on("connect", (client) => {
+      logger.verbose("New client connected to database");
+    });
+
+    pool.on("acquire", (client) => {
+      logger.verbose("Client acquired from pool");
+    });
+
+    pool.on("remove", (client) => {
+      logger.verbose("Client removed from pool");
+    });
+  }
+  return pool;
 };
 
 /**
  * Connect to the database and test connection
  */
 const connectDB = async () => {
-	try {
-		const dbPool = initializePool();
-		const client = await dbPool.connect();
-		logger.verbose("Connected to PostgreSQL database");
-		client.release();
-	} catch (error) {
-		logger.critical("Failed to connect to database:", error);
-		throw error;
-	}
+  try {
+    logger.verbose("Attempting to connect to database...");
+    const dbPool = initializePool();
+    const client = await dbPool.connect();
+    logger.verbose("Connected to PostgreSQL database");
+    
+    // Test query to verify connection
+    const result = await client.query('SELECT NOW() as current_time, version() as db_version');
+    logger.verbose("Database test query successful:", {
+      current_time: result.rows[0].current_time,
+      db_version: result.rows[0].db_version.split(' ')[0] // Just PostgreSQL version number
+    });
+    
+    client.release();
+  } catch (error) {
+    logger.critical("Failed to connect to database:", error);
+    logger.critical("Database connection error details:", {
+      code: error.code,
+      errno: error.errno,
+      syscall: error.syscall,
+      address: error.address,
+      port: error.port,
+      message: error.message
+    });
+    throw error;
+  }
 };
 
 /**
@@ -48,22 +108,21 @@ const connectDB = async () => {
  * @returns {Promise<Object>} Query result
  */
 const query = async (text, params = []) => {
-	const dbPool = initializePool();
-	const start = Date.now();
-
-	try {
-		const result = await dbPool.query(text, params);
-		const duration = Date.now() - start;
-		logger.verbose("Executed query", {
-			text,
-			duration,
-			rows: result.rowCount,
-		});
-		return result;
-	} catch (error) {
-		logger.critical("Database query error:", error);
-		throw error;
-	}
+  const dbPool = initializePool();
+  const start = Date.now();
+  try {
+    const result = await dbPool.query(text, params);
+    const duration = Date.now() - start;
+    logger.verbose("Executed query", {
+      text,
+      duration,
+      rows: result.rowCount,
+    });
+    return result;
+  } catch (error) {
+    logger.critical("Database query error:", error);
+    throw error;
+  }
 };
 
 /**
@@ -71,12 +130,24 @@ const query = async (text, params = []) => {
  * @returns {Promise<Object>} Database client
  */
 const getClient = async () => {
-	const dbPool = initializePool();
-	return await dbPool.connect();
+  const dbPool = initializePool();
+  return await dbPool.connect();
+};
+
+/**
+ * Close the database pool
+ */
+const closePool = async () => {
+  if (pool) {
+    await pool.end();
+    pool = null;
+    logger.verbose("Database pool closed");
+  }
 };
 
 module.exports = {
-	connectDB,
-	query,
-	getClient,
+  connectDB,
+  query,
+  getClient,
+  closePool,
 };
